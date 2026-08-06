@@ -163,4 +163,49 @@ function runFuzzyTopsis(rawMatrix, weights, impacts) {
   return { scores, ranks };
 }
 
-module.exports = { runFuzzyTopsis, convertToFuzzyMatrix, linguisticToTFN };
+/**
+ * Runs Sensitivity Analysis by perturbing each weight by +10% 
+ * and checking if the #1 ranked alternative changes.
+ */
+function runFuzzySensitivityAnalysis(matrix, originalWeights, impacts) {
+  const { ranks: originalRanks } = runFuzzyTopsis(matrix, originalWeights, impacts);
+  const originalTopChoiceIndex = originalRanks.indexOf(1);
+  
+  let stableCount = 0;
+  const perturbations = [];
+
+  for (let i = 0; i < originalWeights.length; i++) {
+    // Increase weight by 10%
+    const newWeights = [...originalWeights];
+    newWeights[i] = newWeights[i] * 1.1;
+    
+    // Normalize weights back to sum to 1
+    const sum = newWeights.reduce((a, b) => a + b, 0);
+    const normalizedWeights = newWeights.map(w => w / sum);
+
+    const { ranks: newRanks } = runFuzzyTopsis(matrix, normalizedWeights, impacts);
+    const newTopChoiceIndex = newRanks.indexOf(1);
+    
+    const isStable = newTopChoiceIndex === originalTopChoiceIndex;
+    if (isStable) stableCount++;
+
+    perturbations.push({
+      criteriaIndex: i,
+      isStable
+    });
+  }
+
+  const stabilityScore = stableCount / originalWeights.length;
+  
+  return {
+    stabilityScore,
+    isHighlyStable: stabilityScore >= 0.8,
+    perturbations
+  };
+}
+
+module.exports = {
+  linguisticToTFN,
+  runFuzzyTopsis,
+  runFuzzySensitivityAnalysis
+};
