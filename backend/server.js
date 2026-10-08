@@ -5,6 +5,8 @@
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
+const swaggerUi = require("swagger-ui-express");
+const swaggerDocument = require("./swagger.json");
 require("dotenv").config();
 
 const { runTopsis, validateInputs, runSensitivityAnalysis } = require("./topsis.js");
@@ -13,10 +15,16 @@ const { getWeightsAndImpactsFromLLM } = require("./agent.js");
 const { parseFile } = require("./parsers");
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
+});
 
 app.use(cors());
 app.use(express.json());
+
+// Swagger / OpenAPI documentation
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 function parseMaybeJson(value) {
   if (typeof value !== "string") {
@@ -141,17 +149,30 @@ app.get("/api/health", (req, res) => {
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error("Global Error Handler caught:", err);
-  
+
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        error: "Uploaded file exceeds the 5 MB limit. Please upload a smaller file.",
+      });
+    }
+    return res.status(400).json({ error: `File upload error: ${err.message}` });
+  }
+
   const status = err.status || 500;
   const message = err.message || "Internal Server Error";
-  
+
   res.status(status).json({
     error: message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
   });
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+module.exports = app;

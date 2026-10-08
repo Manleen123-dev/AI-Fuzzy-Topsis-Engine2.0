@@ -4,6 +4,8 @@ import { Activity, UploadCloud, CheckCircle, AlertCircle, Trash2, Layers, Slider
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export default function App() {
   const [file, setFile] = useState(null);
   const [preference, setPreference] = useState('');
@@ -46,7 +48,7 @@ export default function App() {
     formData.append('isFuzzy', isFuzzy);
     
     try {
-      const response = await axios.post('http://localhost:5000/api/extract-weights', formData, {
+      const response = await axios.post(`${API_BASE_URL}/api/extract-weights`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       // response.data contains matrix, criteriaNames, alternativeNames, weights, impacts, isFuzzy
@@ -93,7 +95,7 @@ export default function App() {
     setLoading(true);
     
     try {
-      const response = await axios.post('http://localhost:5000/api/rank', extractedData);
+      const response = await axios.post(`${API_BASE_URL}/api/rank`, extractedData);
       setResults(response.data);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Something went wrong.');

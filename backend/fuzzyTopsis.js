@@ -31,7 +31,32 @@ function validateFuzzyInputs(matrix, weights, impacts) {
       if (!Array.isArray(val) || val.length !== 3) {
         throw new Error(`Matrix values must be fuzzy [l,m,u] arrays. Got: ${JSON.stringify(val)}`);
       }
+      if (val.some(v => typeof v !== 'number' || !Number.isFinite(v))) {
+        throw new Error(`Fuzzy values must contain finite numbers. Got: ${JSON.stringify(val)}`);
+      }
     }
+  }
+
+  if (weights.length !== numCriteria) {
+    throw new Error(
+      `Number of weights (${weights.length}) must match number of criteria (${numCriteria}).`
+    );
+  }
+
+  if (impacts.length !== numCriteria) {
+    throw new Error(
+      `Number of impacts (${impacts.length}) must match number of criteria (${numCriteria}).`
+    );
+  }
+
+  for (const impact of impacts) {
+    if (impact !== "+" && impact !== "-") {
+      throw new Error(`Impact values must be '+' or '-', got '${impact}'.`);
+    }
+  }
+
+  if (weights.some((w) => w <= 0 || !Number.isFinite(w))) {
+    throw new Error("All weights must be positive numbers.");
   }
 }
 
@@ -73,7 +98,7 @@ function runFuzzyTopsis(rawMatrix, weights, impacts) {
   const numRows = matrix.length;
   const numCols = matrix[0].length;
 
-  // Step 1: Normalize the Fuzzy Matrix
+  // Step 1: Normalize the Fuzzy Matrix with protection against division-by-zero, NaN, and Infinity
   const normMatrix = [];
   for (let i = 0; i < numRows; i++) {
     normMatrix.push(new Array(numCols));
@@ -85,9 +110,14 @@ function runFuzzyTopsis(rawMatrix, weights, impacts) {
       for (let i = 0; i < numRows; i++) {
         if (matrix[i][j][2] > maxU) maxU = matrix[i][j][2];
       }
+      const denom = (maxU === 0 || !Number.isFinite(maxU)) ? 1e-12 : maxU;
       for (let i = 0; i < numRows; i++) {
         const [l, m, u] = matrix[i][j];
-        normMatrix[i][j] = [l/maxU, m/maxU, u/maxU];
+        normMatrix[i][j] = [
+          Number.isFinite(l / denom) ? l / denom : 0,
+          Number.isFinite(m / denom) ? m / denom : 0,
+          Number.isFinite(u / denom) ? u / denom : 0,
+        ];
       }
     } else {
       let minL = Infinity;
@@ -96,14 +126,20 @@ function runFuzzyTopsis(rawMatrix, weights, impacts) {
       }
       for (let i = 0; i < numRows; i++) {
         const [l, m, u] = matrix[i][j];
-        normMatrix[i][j] = [minL/u, minL/m, minL/l];
+        const denomU = (u === 0 || !Number.isFinite(u)) ? 1e-12 : u;
+        const denomM = (m === 0 || !Number.isFinite(m)) ? 1e-12 : m;
+        const denomL = (l === 0 || !Number.isFinite(l)) ? 1e-12 : l;
+        normMatrix[i][j] = [
+          Number.isFinite(minL / denomU) ? minL / denomU : 0,
+          Number.isFinite(minL / denomM) ? minL / denomM : 0,
+          Number.isFinite(minL / denomL) ? minL / denomL : 0,
+        ];
       }
     }
   }
 
   // Step 2: Apply Crisp Weights (from LLM)
-  // Even in Fuzzy TOPSIS, if weights are crisp, we multiply the TFN by the weight scalar.
-  const weightSum = weights.reduce((a, b) => a + b, 0);
+  const weightSum = weights.reduce((a, b) => a + b, 0) || 1e-12;
   const normWeights = weights.map(w => w / weightSum);
 
   const weightedMatrix = normMatrix.map(row => 
@@ -118,11 +154,8 @@ function runFuzzyTopsis(rawMatrix, weights, impacts) {
   const FNIS = new Array(numCols);
 
   for (let j = 0; j < numCols; j++) {
-    // For normalized weighted fuzzy matrix, the ideal bounds are typically [1,1,1] and [0,0,0]
-    // Or we can find the max/min of the weighted matrix components.
-    // Standard approach: v_j* = (1,1,1) x weight and v_j- = (0,0,0)
     const w = normWeights[j];
-    FPIS[j] = [w, w, w]; // max possible normalized value is 1, so 1*w
+    FPIS[j] = [w, w, w];
     FNIS[j] = [0, 0, 0];
   }
 
@@ -140,15 +173,17 @@ function runFuzzyTopsis(rawMatrix, weights, impacts) {
       const dBest = Math.sqrt( ( (v[0]-pBest[0])**2 + (v[1]-pBest[1])**2 + (v[2]-pBest[2])**2 ) / 3 );
       const dWorst = Math.sqrt( ( (v[0]-pWorst[0])**2 + (v[1]-pWorst[1])**2 + (v[2]-pWorst[2])**2 ) / 3 );
 
-      distBest[i] += dBest;
-      distWorst[i] += dWorst;
+      distBest[i] += Number.isFinite(dBest) ? dBest : 0;
+      distWorst[i] += Number.isFinite(dWorst) ? dWorst : 0;
     }
   }
 
   // Step 5: Closeness Coefficient (Score)
   const scores = distBest.map((db, i) => {
     const dw = distWorst[i];
-    return dw / (db + dw || 1e-12);
+    const denom = db + dw || 1e-12;
+    const score = dw / denom;
+    return Number.isFinite(score) ? score : 0;
   });
 
   // Step 6: Rank
@@ -206,6 +241,8 @@ function runFuzzySensitivityAnalysis(matrix, originalWeights, impacts) {
 
 module.exports = {
   linguisticToTFN,
+  validateFuzzyInputs,
+  convertToFuzzyMatrix,
   runFuzzyTopsis,
-  runFuzzySensitivityAnalysis
+  runFuzzySensitivityAnalysis,
 };

@@ -1,0 +1,249 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "AI-Powered Fuzzy TOPSIS Engine API",
+    "version": "1.0.0",
+    "description": "API documentation for the TOPSIS and Fuzzy TOPSIS decision-making engine with LLM-assisted weight generation."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Returns the operational status of the backend server.",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/extract-weights": {
+      "post": {
+        "summary": "Extract Weights and Impacts via LLM",
+        "description": "Parses an uploaded CSV/Excel file (up to 5MB) or raw matrix payload, extracts decision criteria, and queries Groq LLM to derive suggested weights and impacts.",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "CSV or XLSX file (max 5 MB)"
+                  },
+                  "uploaded_file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Alternative field name for file upload"
+                  },
+                  "userPreference": {
+                    "type": "string",
+                    "example": "I want high performance and reliability, but cost is moderately important."
+                  },
+                  "isFuzzy": {
+                    "type": "boolean",
+                    "example": false
+                  },
+                  "criteriaNames": {
+                    "type": "string",
+                    "description": "JSON string array of criteria names (if no file is uploaded)",
+                    "example": "[\"Cost\", \"Performance\", \"Reliability\"]"
+                  },
+                  "alternativeNames": {
+                    "type": "string",
+                    "description": "JSON string array of alternative names (if no file is uploaded)",
+                    "example": "[\"Vendor A\", \"Vendor B\", \"Vendor C\"]"
+                  },
+                  "matrix": {
+                    "type": "string",
+                    "description": "JSON string 2D array of decision matrix values",
+                    "example": "[[250, 80, 9], [300, 90, 8], [200, 70, 7]]"
+                  }
+                },
+                "required": ["userPreference"]
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "criteriaNames": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "example": ["Cost", "Performance", "Reliability"]
+                  },
+                  "alternativeNames": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "example": ["Vendor A", "Vendor B", "Vendor C"]
+                  },
+                  "matrix": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {}
+                    },
+                    "example": [[250, 80, 9], [300, 90, 8], [200, 70, 7]]
+                  },
+                  "userPreference": {
+                    "type": "string",
+                    "example": "Prioritize performance over cost."
+                  },
+                  "isFuzzy": {
+                    "type": "boolean",
+                    "example": false
+                  }
+                },
+                "required": ["criteriaNames", "alternativeNames", "matrix", "userPreference"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Extracted matrix data, LLM weights, and impacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "matrix": { "type": "array", "items": { "type": "array", "items": {} } },
+                    "criteriaNames": { "type": "array", "items": { "type": "string" } },
+                    "alternativeNames": { "type": "array", "items": { "type": "string" } },
+                    "weights": { "type": "array", "items": { "type": "number" }, "example": [0.2, 0.5, 0.3] },
+                    "impacts": { "type": "array", "items": { "type": "string" }, "example": ["-", "+", "+"] },
+                    "isFuzzy": { "type": "boolean", "example": false }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or file size exceeds 5MB limit"
+          },
+          "500": {
+            "description": "LLM extraction error or internal server failure"
+          }
+        }
+      }
+    },
+    "/api/rank": {
+      "post": {
+        "summary": "Execute TOPSIS or Fuzzy TOPSIS Ranking",
+        "description": "Computes relative closeness scores, ranks alternatives, and performs sensitivity analysis.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["matrix", "alternativeNames", "weights", "impacts"],
+                "properties": {
+                  "matrix": {
+                    "type": "array",
+                    "description": "2D decision matrix (numbers or fuzzy linguistic strings / TFN triplets)",
+                    "items": { "type": "array", "items": {} },
+                    "example": [
+                      [250, 16, 12],
+                      [200, 16, 8],
+                      [300, 32, 16]
+                    ]
+                  },
+                  "alternativeNames": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "example": ["Model A", "Model B", "Model C"]
+                  },
+                  "weights": {
+                    "type": "array",
+                    "items": { "type": "number" },
+                    "example": [0.25, 0.45, 0.3]
+                  },
+                  "impacts": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "example": ["-", "+", "+"]
+                  },
+                  "isFuzzy": {
+                    "type": "boolean",
+                    "example": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Calculated scores, ranks, and sensitivity metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "weights": { "type": "array", "items": { "type": "number" } },
+                    "impacts": { "type": "array", "items": { "type": "string" } },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string" },
+                          "score": { "type": "number" },
+                          "rank": { "type": "integer" }
+                        }
+                      }
+                    },
+                    "sensitivity": {
+                      "type": "object",
+                      "properties": {
+                        "stabilityScore": { "type": "number" },
+                        "isHighlyStable": { "type": "boolean" },
+                        "perturbations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "criteriaIndex": { "type": "integer" },
+                              "isStable": { "type": "boolean" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input matrix or mismatched criteria/weights/impacts"
+          },
+          "500": {
+            "description": "Internal server computation error"
+          }
+        }
+      }
+    }
+  }
+}
