@@ -26,6 +26,24 @@ app.use(express.json());
 // Swagger / OpenAPI documentation
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
+// Root welcome & health route
+app.get("/", (req, res) => {
+  if (req.accepts("html")) {
+    return res.redirect("/api-docs");
+  }
+  res.json({
+    status: "ok",
+    message: "AI-Powered Fuzzy TOPSIS Engine API is running.",
+    documentation: "/api-docs",
+    endpoints: {
+      health: "/api/health",
+      docs: "/api-docs",
+      extractWeights: "POST /api/extract-weights",
+      rank: "POST /api/rank",
+    },
+  });
+});
+
 function parseMaybeJson(value) {
   if (typeof value !== "string") {
     return value;
