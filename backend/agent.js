@@ -9,7 +9,7 @@
  */
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 const GROQ_TEMPERATURE =
   process.env.GROQ_TEMPERATURE !== undefined
     ? parseFloat(process.env.GROQ_TEMPERATURE)
@@ -120,6 +120,7 @@ async function getWeightsAndImpactsFromLLM(criteriaNames, userPreference, retrie
           model: GROQ_MODEL,
           messages: [{ role: "user", content: prompt }],
           temperature: GROQ_TEMPERATURE,
+          response_format: { type: "json_object" },
         }),
       });
 

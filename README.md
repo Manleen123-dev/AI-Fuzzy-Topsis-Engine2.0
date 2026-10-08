@@ -29,7 +29,7 @@ This project follows a strict 6-step enterprise workflow. Here is exactly what h
 
 ### 2. AI Context Extraction (Groq LLM)
 * **What happens:** The user types a natural language preference (e.g., *"I want the cheapest option, but durability is extremely important."*).
-* **The Tech:** The backend sends the column names and the user's text to the **Groq LLM** (`llama-3.3-70b-versatile` configurable via environment variables). The LLM is strictly prompted to return a JSON object containing mathematical **Weights** and **Impacts** (`+` for benefit, `-` for cost). Robust type coercion and validation ensure weights are positive finite numbers summing correctly.
+* **The Tech:** The backend sends the column names and the user's text to the **Groq LLM** (`openai/gpt-oss-120b` or `llama-3.3-70b-versatile`, configurable via environment variables with native JSON mode). The LLM is strictly prompted to return a JSON object containing mathematical **Weights** and **Impacts** (`+` for benefit, `-` for cost). Robust type coercion and validation ensure weights are positive finite numbers summing correctly.
 
 ### 3. Human-in-the-Loop (Manual Overrides)
 * **What happens:** AI can hallucinate, so enterprise systems never blindly trust it. The frontend pauses and displays the AI's suggested weights on interactive sliders. 
@@ -94,7 +94,7 @@ Create a `.env` file in the **backend** directory:
 ```env
 PORT=5000
 GROQ_API_KEY=your_groq_api_key_here
-GROQ_MODEL=llama-3.3-70b-versatile       # Optional: defaults to llama-3.3-70b-versatile
+GROQ_MODEL=openai/gpt-oss-120b          # Optional: defaults to openai/gpt-oss-120b (or llama-3.3-70b-versatile)
 GROQ_TEMPERATURE=0                      # Optional: defaults to 0
 ```
 
